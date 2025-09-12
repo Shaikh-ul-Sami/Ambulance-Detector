@@ -1,0 +1,31 @@
+# Sensitive Information
+# NEVER commit your config file with secret keys.
+config.py
+
+# AI Model Files
+# These are often large and should be downloaded separately.
+*.pt
+
+# Python virtual environment
+venv/
+.venv/
+env/
+.env/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE / Editor specific folders
+.vscode/
+.idea/
+
+# Test and coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS-specific files
+.DS_Store

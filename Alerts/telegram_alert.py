@@ -1,16 +1,13 @@
 import requests
-
-# --- IMPORTANT ---
-# Paste your own Bot Token and Chat ID here
-BOT_TOKEN = "8459655122:AAHbrveXm-YJtUMA14wvBP-gEy0xABLMPjQ"
-CHAT_ID = "1362872793"
+from config import BOT_TOKEN, CHAT_ID # Import from the new config file
 
 def send_alert(message="Ambulance detected! Clearing route."):
     """
     Sends a message to your Telegram account via your bot.
     """
     # This is the URL for the Telegram Bot API
-    url = f"https://api.telegram.org/bot{B8459655122:AAHbrveXm-YJtUMA14wvBP-gEy0xABLMPjQ}/sendMessage"
+    # FIX: Correctly reference the BOT_TOKEN variable
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     
     # This is the data we are sending
     payload = {
@@ -20,7 +17,7 @@ def send_alert(message="Ambulance detected! Clearing route."):
     
     try:
         # Send the request
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, timeout=5) # Add a 5-second timeout
         # Check if it was successful
         if response.status_code == 200:
             print("Alert sent successfully!")

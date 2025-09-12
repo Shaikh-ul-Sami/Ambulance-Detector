@@ -1,0 +1,113 @@
+<!-- d:\Smart Ambulance Traffic\templates\index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Traffic Control</title>
+    <style>
+        body { font-family: sans-serif; background-color: #2c3e50; color: #ecf0f1; display: flex; flex-direction: column; align-items: center; margin: 0; }
+        h1 { color: #3498db; }
+        .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 20px; }
+        .video-container { border: 2px solid #34495e; padding: 5px; background-color: #34495e; }
+        .controls { display: flex; flex-direction: column; gap: 10px; background-color: #34495e; padding: 20px; border-radius: 8px; }
+        .status-panel { display: flex; flex-direction: column; gap: 15px; background-color: #34495e; padding: 20px; border-radius: 8px; min-width: 250px; }
+        .controls h2 { margin-top: 0; }
+        button { background-color: #3498db; color: white; border: none; padding: 15px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #2980b9; }
+        button.auto { background-color: #2ecc71; }
+        button.auto:hover { background-color: #27ae60; }
+        #notifications { position: fixed; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
+        .toast { background-color: rgba(44, 62, 80, 0.9); padding: 15px; border-radius: 5px; border-left: 5px solid #3498db; animation: fadeIn 0.5s, fadeOut 0.5s 4.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        /* Traffic Light Styles */
+        .light-indicator { display: flex; align-items: center; justify-content: space-between; }
+        .light-indicator span { font-size: 1.2em; text-transform: uppercase; }
+        .light-circle { width: 40px; height: 40px; border-radius: 50%; background-color: #1a252f; border: 2px solid #111; }
+        .light-circle.red { background-color: #e74c3c; box-shadow: 0 0 15px #c0392b; }
+        .light-circle.yellow { background-color: #f1c40f; box-shadow: 0 0 15px #f39c12; }
+        .light-circle.green { background-color: #2ecc71; box-shadow: 0 0 15px #27ae60; }
+        .status-info { font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <h1>Smart Traffic Control Dashboard</h1>
+    <div class="container">
+        <div class="video-container">
+            <img src="{{ url_for('video_feed') }}" width="640">
+        </div>
+        <div class="status-panel">
+            <h2>Signal Status</h2>
+            <div class="light-indicator">
+                <span>Left</span><div id="light-left" class="light-circle"></div>
+            </div>
+            <div class="light-indicator">
+                <span>Straight</span><div id="light-straight" class="light-circle"></div>
+            </div>
+            <div class="light-indicator">
+                <span>Right</span><div id="light-right" class="light-circle"></div>
+            </div>
+            <hr>
+            <div id="vehicle-count" class="status-info">Vehicles: --</div>
+        </div>
+        <div class="controls">
+            <h2>Manual Control</h2>
+            <button onclick="send_command('force_green')">Force Green</button>
+            <button onclick="send_command('force_red')">Force Red</button>
+            <button class="auto" onclick="send_command('auto')">Return to Auto</button>
+        </div>
+    </div>
+    <div id="notifications"></div>
+
+    <script>
+        // --- SSE for Notifications ---
+        const eventSource = new EventSource("/events");
+        eventSource.onmessage = function(event) {
+            showToast(event.data);
+        };
+
+        function showToast(message) {
+            const notificationsContainer = document.getElementById('notifications');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            notificationsContainer.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 5000); // Remove toast after 5 seconds
+        }
+
+        // --- Manual Control Commands ---
+        async function send_command(action) {
+            await fetch('/manual_override', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'action': action })
+            });
+        }
+
+        // --- Status Polling ---
+        function updateStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update vehicle count
+                    document.getElementById('vehicle-count').textContent = `Vehicles: ${data.vehicle_count}`;
+
+                    // Update each light
+                    for (const lane in data.lights) {
+                        const lightElement = document.getElementById(`light-${lane}`);
+                        lightElement.className = 'light-circle'; // Reset classes
+                        lightElement.classList.add(data.lights[lane].toLowerCase());
+                    }
+                })
+                .catch(error => console.error('Error fetching status:', error));
+        }
+        setInterval(updateStatus, 1000); // Update status every second
+                updateStatus(); // Also call it once immediately on page load
+
+    </script>
+</body>
+</html>

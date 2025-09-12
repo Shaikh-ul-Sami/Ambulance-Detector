@@ -1,9 +1,6 @@
 import requests
 import time
-
-# --- IMPORTANT ---
-# Your Bot Token is correct.
-BOT_TOKEN = "8459655122:AAHbrveXm-YJtUMA14wvBP-gEy0xABLMPjQ"
+from config import BOT_TOKEN # Import from the new config file
 
 def get_chat_id():
     """

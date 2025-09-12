@@ -1,9 +1,10 @@
 from ultralytics import YOLO
 import cv2
 import matplotlib.pyplot as plt # Import the new library
+from constants import YOLO_MODEL_PATH # Import from constants
 
 # --- CONFIGURATION ---
-MODEL_TO_USE = "yolov8n.pt"
+MODEL_TO_USE = YOLO_MODEL_PATH
 IMAGE_TO_TEST = "test.jpg"
 
 # --- SCRIPT ---
