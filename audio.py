@@ -15,7 +15,7 @@ def audio_listener_thread(siren_detected_callback, stop_event=None):
         stop_event (threading.Event, optional): Event to signal the thread to stop.
     """
     SAMPLE_RATE = 44100
-    CHUNK_SIZE = 1024
+    CHUNK_SIZE = 2048 # Analyze audio in larger chunks to reduce callback frequency
     detection_history = collections.deque(maxlen=constants.SIREN_DETECTION_WINDOW)
 
     def audio_callback(indata, frames, time, status):

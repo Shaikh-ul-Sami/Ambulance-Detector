@@ -10,12 +10,21 @@ class VisionProcessor:
     """
     Handles video capture, frame resizing, and object detection.
     """
-    def __init__(self, video_source=0):
+    def __init__(self, video_source=0, lane_name="default"):
         self.model = YOLO(constants.YOLO_MODEL_PATH)
         self.video_source = video_source
-        self.cap = cv2.VideoCapture(self.video_source)
+        self.lane_name = lane_name
+
+        # --- FIX: Conditionally apply backend based on source type ---
+        if isinstance(self.video_source, int):
+            # For webcams (integer index), use VFW as it was the only one that worked.
+            self.cap = cv2.VideoCapture(self.video_source, cv2.CAP_VFW)
+        else:
+            # For video files (string path), use the default backend which is best for files.
+            self.cap = cv2.VideoCapture(self.video_source)
+
         if not self.cap.isOpened():
-            raise IOError(f"Cannot open video source: {video_source}")
+            raise IOError(f"Cannot open video source for lane '{self.lane_name}': {video_source}.")
 
         self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -48,10 +57,17 @@ class VisionProcessor:
 
     def read(self):
         """Returns the latest frame read by the background thread."""
-        with self.lock:
-            if self.latest_frame is None:
-                return False, None
-            return True, self.latest_frame.copy()
+        # --- FIX: Wait for the first frame to be available ---
+        # This prevents other threads from getting 'None' if they ask for a frame
+        # before the camera has initialized.
+        for _ in range(10): # Try up to 10 times (total 1 second)
+            with self.lock:
+                if self.latest_frame is not None:
+                    return True, self.latest_frame.copy()
+            time.sleep(0.1) # Wait a moment for the reader thread
+        
+        # If we still don't have a frame after waiting, return failure.
+        return False, None
 
     def process_frame(self):
         """

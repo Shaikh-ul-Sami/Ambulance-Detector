@@ -30,6 +30,14 @@
         .light-circle.yellow { background-color: #f1c40f; box-shadow: 0 0 15px #f39c12; }
         .light-circle.green { background-color: #2ecc71; box-shadow: 0 0 15px #27ae60; }
         .status-info { font-size: 1.1em; }
+
+        /* --- FIX: Add missing styles for manual lane controls --- */
+        .lane-control-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .lane-control-group span { font-weight: bold; text-transform: capitalize; }
+        .state-btn { padding: 5px 10px; font-size: 14px; min-width: 30px; }
+        .state-btn.red { background-color: #c0392b; }
+        .state-btn.yellow { background-color: #f39c12; color: #333; }
+        .state-btn.green { background-color: #27ae60; }
     </style>
 </head>
 <body>
@@ -40,28 +48,26 @@
         </div>
         <div class="status-panel">
             <h2>Signal Status</h2>
-            <div class="light-indicator">
-                <span>Left</span><div id="light-left" class="light-circle"></div>
-            </div>
-            <div class="light-indicator">
-                <span>Straight</span><div id="light-straight" class="light-circle"></div>
-            </div>
-            <div class="light-indicator">
-                <span>Right</span><div id="light-right" class="light-circle"></div>
-            </div>
-            <hr>
-            <div id="vehicle-count" class="status-info">Vehicles: --</div>
+            <div id="light-status-container"></div>
+            <hr/>
+            <div id="density-info-container"></div>
         </div>
         <div class="controls">
             <h2>Manual Control</h2>
-            <button onclick="send_command('force_green')">Force Green</button>
-            <button onclick="send_command('force_red')">Force Red</button>
-            <button class="auto" onclick="send_command('auto')">Return to Auto</button>
+            <div id="lane-controls">
+                <!-- Lane-specific controls will be dynamically inserted here by JavaScript -->
+            </div>
+            <hr>
+            <button id="auto-mode-btn" class="auto" onclick="send_command('auto', null)" style="display: none;">Return to Auto Mode</button>
         </div>
     </div>
     <div id="notifications"></div>
 
     <script>
+        // --- Constants ---
+        const LANES = ['north', 'south', 'east', 'west']; // This must match constants.py
+        const LIGHT_STATES = ['red', 'yellow', 'green'];
+
         // --- SSE for Notifications ---
         const eventSource = new EventSource("/events");
         eventSource.onmessage = function(event) {
@@ -80,12 +86,13 @@
         }
 
         // --- Manual Control Commands ---
-        async function send_command(action) {
+        async function send_command(action, lane, state) {
             await fetch('/manual_override', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 'action': action })
+                body: JSON.stringify({ 'action': action, 'lane': lane, 'state': state })
             });
+            updateStatus(); // Immediately fetch new status after sending command
         }
 
         // --- Status Polling ---
@@ -93,21 +100,83 @@
             fetch('/status')
                 .then(response => response.json())
                 .then(data => {
-                    // Update vehicle count
-                    document.getElementById('vehicle-count').textContent = `Vehicles: ${data.vehicle_count}`;
+                    // Update per-lane vehicle counts
+                    for (const lane in data.density_per_lane) {
+                        const countElement = document.getElementById(`density-${lane}`);
+                        if (countElement) countElement.textContent = `Vehicles: ${data.density_per_lane[lane]}`;
+                    }
 
                     // Update each light
                     for (const lane in data.lights) {
                         const lightElement = document.getElementById(`light-${lane}`);
                         lightElement.className = 'light-circle'; // Reset classes
+                        if (!lightElement) {
+                            console.error(`HTML element for lane '${lane}' not found! Check your LANES constant in JS and HTML.`);
+                            continue;
+                        }
                         lightElement.classList.add(data.lights[lane].toLowerCase());
                     }
+
+                    // Show/hide manual controls based on backend state
+                    // The lane controls should always be visible.
+                    document.getElementById('auto-mode-btn').style.display = data.manual_mode ? 'block' : 'none'; // Only show 'auto' button when in manual mode.
                 })
                 .catch(error => console.error('Error fetching status:', error));
         }
         setInterval(updateStatus, 1000); // Update status every second
-                updateStatus(); // Also call it once immediately on page load
+        
+        // --- Dynamic UI Generation ---
+        function createLaneControls() {
+            const statusContainer = document.getElementById('light-status-container');
+            const densityContainer = document.getElementById('density-info-container');
+            LANES.forEach(lane => {
+                const indicatorDiv = document.createElement('div');
+                indicatorDiv.className = 'light-indicator';
 
+                const label = document.createElement('span');
+                label.textContent = lane.charAt(0).toUpperCase() + lane.slice(1);
+                indicatorDiv.appendChild(label);
+
+                const circle = document.createElement('div');
+                circle.id = `light-${lane}`;
+                circle.className = 'light-circle';
+                indicatorDiv.appendChild(circle);
+                statusContainer.appendChild(indicatorDiv);
+
+                // Create density info element
+                const densityDiv = document.createElement('div');
+                densityDiv.id = `density-${lane}`;
+                densityDiv.className = 'status-info';
+                densityDiv.textContent = 'Vehicles: --';
+                densityContainer.appendChild(densityDiv);
+            });
+            const container = document.getElementById('lane-controls');
+            LANES.forEach(lane => {
+                const laneDiv = document.createElement('div');
+                laneDiv.className = 'lane-control-group';
+                
+                const label = document.createElement('span');
+                label.textContent = lane.charAt(0).toUpperCase() + lane.slice(1);
+                laneDiv.appendChild(label);
+                
+                const buttonGroup = document.createElement('div');
+                LIGHT_STATES.forEach(state => {
+                    const button = document.createElement('button');
+                    button.textContent = state.charAt(0).toUpperCase();
+                    button.className = `state-btn ${state}`;
+                    button.onclick = () => send_command('set_lane', lane, state.toUpperCase());
+                    buttonGroup.appendChild(button);
+                });
+                laneDiv.appendChild(buttonGroup);
+                container.appendChild(laneDiv);
+            });
+        }
+
+        // --- Initial Setup on Page Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            createLaneControls();
+            updateStatus(); // Call it once immediately on page load
+        });
     </script>
 </body>
 </html>
